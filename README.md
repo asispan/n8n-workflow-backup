@@ -6,6 +6,16 @@ An automated n8n workflow that backs up Docker container directories from a VPS 
 
 This workflow monitors a VPS backup directory for new Docker container backups, compresses them into timestamped archives, and automatically pushes them to a GitHub repository with AES-256 encryption. The workflow uses git-crypt to handle encryption transparently, eliminating complex key management typically required for secure backup solutions.
 
+<p align="center">
+  <img src="https://img.shields.io/badge/n8n-Workflow%20Automation-2C3E50?style=for-the-badge&logo=n8n&logoColor=white" alt="n8n Badge"/>
+  <img src="https://img.shields.io/badge/Docker-Containerization-0db7ed?style=for-the-badge&logo=docker&logoColor=white" alt="Docker Badge"/>
+  <img src="https://img.shields.io/badge/Git-Version%20Control-F05032?style=for-the-badge&logo=git&logoColor=white" alt="Git Badge"/>
+  <img src="https://img.shields.io/badge/git--crypt-Encryption-1B1F23?style=for-the-badge&logo=github&logoColor=white" alt="git-crypt Badge"/>
+  <img src="https://img.shields.io/badge/GitHub-Remote%20Storage-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub Badge"/>
+  <img src="https://img.shields.io/badge/SSH-Secure%20Access-4B8BBE?style=for-the-badge&logo=gnu-bash&logoColor=white" alt="SSH Badge"/>
+  <img src="https://img.shields.io/badge/JavaScript-Logic%20%26%20Automation-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black" alt="JavaScript Badge"/>
+</p>
+
 ## Features
 
 - Automated detection of new backup folders
