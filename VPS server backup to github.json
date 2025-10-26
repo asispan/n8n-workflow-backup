@@ -1,0 +1,570 @@
+{
+  "name": "VPS Backup to Github",
+  "nodes": [
+    {
+      "parameters": {
+        "command": "ls -1d /path/to/your/backup-directory/*/",
+        "cwd": "/path/to/your"
+      },
+      "id": "5ad3ecc8-4ea6-4e77-8261-288e8fa682e9",
+      "name": "List Backup Folders on VPS",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -5200,
+        176
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the folder list from SSH output\nconst sshOutput = $input.first().json.stdout || '';\nconst folders = sshOutput.split('\\n').filter(folder => folder.trim() !== '');\n\n// Get previously synced folders from static data (or empty array on first run)\nconst staticData = $getWorkflowStaticData('global');\nconst previousFolders = staticData.syncedFolders || [];\n\n// Find new folders\nconst newFolders = folders.filter(folder => !previousFolders.includes(folder));\n\n// Update static data with all current folders\nstaticData.syncedFolders = folders;\n\n// Return new folders for processing\nif (newFolders.length === 0) {\n  return [{\n    json: {\n      message: 'No new backup folders found',\n      totalFolders: folders.length,\n      previouslySynced: previousFolders.length,\n      isNewFolder: false\n    }\n  }];\n}\n\n// Return each new folder as a separate item\nconst items = [];\nfor (const folder of newFolders) {\n  const folderParts = folder.split('/').filter(p => p);\n  const folderName = folderParts[folderParts.length - 1];\n  \n  items.push({\n    json: {\n      folderPath: folder,\n      folderName: folderName,\n      isNewFolder: true\n    }\n  });\n}\n\nreturn items;"
+      },
+      "id": "a9196563-b819-4046-bb2f-2224cd619882",
+      "name": "Identify New Folders",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4976,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.isNewFolder}}",
+              "value2": "={{true}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7c249d33-021e-404f-b353-4985fc0aebcc",
+      "name": "Has New Folders?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -4752,
+        176
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "15a62d04-f759-481e-92f8-58ed7c97d897",
+      "name": "No New Folders Message",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -4528,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate timestamp and archive filename\nconst now = new Date();\nconst timestamp = now.toISOString().replace(/[-:]/g, '').replace(/\\..+/, '').replace('T', '-');\nconst folderName = $input.first().json.folderName;\nconst folderPath = $input.first().json.folderPath;\nconst archiveName = `backup-${folderName}-${timestamp}.tar.gz`;\n\nreturn [{\n  json: {\n    folderName: folderName,\n    folderPath: folderPath,\n    archiveName: archiveName,\n    timestamp: timestamp,\n    isNewFolder: true\n  }\n}];"
+      },
+      "id": "a52b779f-4554-4d2a-8cd6-a16d3932ddcf",
+      "name": "Prepare Archive Details",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4528,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "command": "cd /path/to/your/backup-directory && tar -czf \"{{$json.archiveName}}\" -C \"{{$json.folderPath}}\" .",
+        "cwd": "/path/to/your/Dropbox/docker-backups"
+      },
+      "id": "f6f9c493-233b-4850-8208-41879e9c6b01",
+      "name": "Create Compressed Archive",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -4304,
+        64
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "cd /path/to/your/backup-directory && ls -lh \"{{$json.archiveName}}\"",
+        "cwd": "/path/to/your/Dropbox/docker-backups"
+      },
+      "id": "9fee1565-800f-4aea-bf43-30bb4dbe6548",
+      "name": "Verify Archive Created",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -4080,
+        64
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the ls output to get file size\nconst lsOutput = $input.first().json.stdout || '';\nconst sizeMatch = lsOutput.match(/\\s+(\\d+[KMGT]?)\\s+/);\nconst fileSize = sizeMatch ? sizeMatch[1] : 'unknown';\n\n// Get the archive info from previous node\nconst archiveName = $input.first().json.archiveName;\nconst folderName = $input.first().json.folderName;\nconst timestamp = $input.first().json.timestamp;\n\nreturn [{\n  json: {\n    archiveName: archiveName,\n    folderName: folderName,\n    timestamp: timestamp,\n    fileSize: fileSize,\n    archiveVerified: true\n  }\n}];"
+      },
+      "id": "d64c1f77-a875-43f9-ab8c-53f33490db68",
+      "name": "Parse Archive Info",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3856,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "command": "cd /path/to/your/backup-directory && git add \"{{$json.archiveName}}\"",
+        "cwd": "/path/to/your/Dropbox/docker-backups"
+      },
+      "id": "2cfe2a9f-c100-4fcc-9bfc-c0a0473eec39",
+      "name": "Git Add Archive File",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -3632,
+        64
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "cd /path/to/your/backup-directory && git commit -m \"Automated backup: {{$json.folderName}} - {{$json.timestamp}} ({{$json.fileSize}})\"",
+        "cwd": "/path/to/your/Dropbox/docker-backups"
+      },
+      "id": "fd675bf4-c109-4e92-931c-e92601160291",
+      "name": "Git Commit with Message",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -3408,
+        64
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "cd /path/to/your/backup-directory && git push origin main",
+        "cwd": "/path/to/your/Dropbox/docker-backups"
+      },
+      "id": "dcdb40d7-2b69-4f7b-be95-1be26696af4f",
+      "name": "Git Push to GitHub",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -3184,
+        64
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse git push output for success confirmation\nconst pushOutput = $input.first().json.stdout || '';\nconst stderrOutput = $input.first().json.stderr || '';\nconst combinedOutput = pushOutput + stderrOutput;\n\nconst archiveName = $input.first().json.archiveName;\nconst folderName = $input.first().json.folderName;\nconst fileSize = $input.first().json.fileSize;\nconst timestamp = $input.first().json.timestamp;\n\n// Check for success indicators in git output\nconst isSuccess = combinedOutput.includes('main -> main') || \n                  combinedOutput.includes('To github.com') ||\n                  combinedOutput.includes('Writing objects');\n\nreturn [{\n  json: {\n    success: isSuccess,\n    archiveName: archiveName,\n    folderName: folderName,\n    fileSize: fileSize,\n    timestamp: timestamp,\n    gitOutput: combinedOutput,\n    message: `Successfully backed up ${folderName} (${fileSize}) to GitHub with git-crypt encryption`\n  }\n}];"
+      },
+      "id": "1f499ca8-57e1-47ca-9a37-7a94c0c65fbf",
+      "name": "Verify Push Success",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2960,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.success}}",
+              "value2": "={{true}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f4e42aaf-5255-48d6-9101-348bf4bfcfd5",
+      "name": "Push Successful?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -2736,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "command": "cd /path/to/your/backup-directory && rm -f \"{{$json.archiveName}}\"",
+        "cwd": "/path/to/your/Dropbox/docker-backups"
+      },
+      "id": "2f95ec19-e4c6-4faf-a348-ee2453f46dba",
+      "name": "Cleanup Local Archive",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -2512,
+        -48
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Final success summary\nconst folderName = $input.first().json.folderName;\nconst archiveName = $input.first().json.archiveName;\nconst fileSize = $input.first().json.fileSize;\nconst timestamp = $input.first().json.timestamp;\n\nconst now = new Date();\nconst completedAt = now.toISOString();\n\nreturn [{\n  json: {\n    status: 'completed',\n    folderName: folderName,\n    archiveName: archiveName,\n    fileSize: fileSize,\n    backupTimestamp: timestamp,\n    completedAt: completedAt,\n    githubRepo: 'https://github.com/YOUR_USERNAME/YOUR_REPO',\n    encrypted: true,\n    encryptionMethod: 'git-crypt (AES-256)',\n    message: `\u2705 Backup completed successfully!\\n\\nFolder: ${folderName}\\nArchive: ${archiveName}\\nSize: ${fileSize}\\nEncrypted: Yes (git-crypt)\\nRepository: github.com/YOUR_USERNAME/YOUR_REPO\\nCompleted: ${completedAt}`\n  }\n}];"
+      },
+      "id": "a6a826cf-eb0d-4599-83b5-80ca36498056",
+      "name": "Generate Success Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2288,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log the failure details\nconst folderName = $input.first().json.folderName;\nconst archiveName = $input.first().json.archiveName;\nconst gitOutput = $input.first().json.gitOutput || 'No output captured';\nconst timestamp = $input.first().json.timestamp;\n\nreturn [{\n  json: {\n    status: 'failed',\n    folderName: folderName,\n    archiveName: archiveName,\n    timestamp: timestamp,\n    error: 'Git push failed',\n    gitOutput: gitOutput,\n    message: `\u274c Backup push failed for ${folderName}\\n\\nArchive: ${archiveName}\\nGit Output: ${gitOutput}\\n\\nThe archive file remains in /root/Dropbox/docker-backups/ for manual inspection.`\n  }\n}];"
+      },
+      "id": "234b8ec7-92ee-444a-a698-2e575f6bd2ed",
+      "name": "Log Push Failure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2512,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "m4nOmq18tuiageov",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/m4nOmq18tuiageov",
+          "cachedResultName": "Error Notification"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "errorMessage": "={{$json.message}}",
+            "errorDetails": "={{$json.gitOutput}}",
+            "workflowName": "VPS Backup to Github",
+            "failedFolder": "={{$json.folderName}}"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -2288,
+        176
+      ],
+      "id": "9c8c5868-5b25-4df6-8f42-eaceb5917c94",
+      "name": "Send Failure Notification"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 21
+            }
+          ]
+        }
+      },
+      "id": "540e8435-65fe-4697-9b12-11095153788c",
+      "name": "Daily 9PM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -5424,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## MAJOR POINT \nThe git config command now works with GIT_DIR=.git. **You may need to use this environment variable prefix for git commands in this directory**, or you can check if there's a git configuration issue with your shell environment.",
+        "width": 400
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -4416,
+        -192
+      ],
+      "typeVersion": 1,
+      "id": "0fcc60f6-e687-4437-afd8-e09b2a40e6b3",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## git-crypt key location\nThe git-crypt key has been successfully exported to ../git-crypt-key/docker-backups.key.",
+        "width": 400
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -3936,
+        -192
+      ],
+      "typeVersion": 1,
+      "id": "cf6154dd-3607-4fa8-ae79-1d9ee6262143",
+      "name": "Sticky Note1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "List Backup Folders on VPS": {
+      "main": [
+        [
+          {
+            "node": "Identify New Folders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Identify New Folders": {
+      "main": [
+        [
+          {
+            "node": "Has New Folders?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has New Folders?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Archive Details",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No New Folders Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No New Folders Message": {
+      "main": [
+        []
+      ]
+    },
+    "Prepare Archive Details": {
+      "main": [
+        [
+          {
+            "node": "Create Compressed Archive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Compressed Archive": {
+      "main": [
+        [
+          {
+            "node": "Verify Archive Created",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Archive Created": {
+      "main": [
+        [
+          {
+            "node": "Parse Archive Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Archive Info": {
+      "main": [
+        [
+          {
+            "node": "Git Add Archive File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Git Add Archive File": {
+      "main": [
+        [
+          {
+            "node": "Git Commit with Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Git Commit with Message": {
+      "main": [
+        [
+          {
+            "node": "Git Push to GitHub",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Git Push to GitHub": {
+      "main": [
+        [
+          {
+            "node": "Verify Push Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Push Success": {
+      "main": [
+        [
+          {
+            "node": "Push Successful?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Push Successful?": {
+      "main": [
+        [
+          {
+            "node": "Cleanup Local Archive",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Push Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cleanup Local Archive": {
+      "main": [
+        [
+          {
+            "node": "Generate Success Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Push Failure": {
+      "main": [
+        [
+          {
+            "node": "Send Failure Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily 9PM": {
+      "main": [
+        [
+          {
+            "node": "List Backup Folders on VPS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Your/Timezone",
+    "callerPolicy": "workflowsFromSameOwner",
+    "executionTimeout": 3600,
+    "errorWorkflow": ""
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    {
+      "createdAt": "2025-09-17T12:16:48.200Z",
+      "updatedAt": "2025-09-17T12:16:48.200Z",
+      "id": "TzhauEm7UY8jL9NQ",
+      "name": "backup"
+    },
+    {
+      "createdAt": "2025-09-17T12:16:48.212Z",
+      "updatedAt": "2025-09-17T12:16:48.212Z",
+      "id": "iVqMVDVs2PPdUBRT",
+      "name": "dropbox"
+    },
+    {
+      "createdAt": "2025-09-17T12:16:48.209Z",
+      "updatedAt": "2025-09-17T12:16:48.209Z",
+      "id": "vbl7nzt78gjGO5uM",
+      "name": "file-sync"
+    }
+  ]
+}
