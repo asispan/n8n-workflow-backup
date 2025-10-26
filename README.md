@@ -1,6 +1,6 @@
 # VPS Backup to GitHub with n8n
 
-An automated n8n workflow that backs up Docker container directories from a VPS to a GitHub repository with transparent encryption using git-crypt.
+An automated n8n workflow that backs up Docker container directories from your VPS (virtual private server) to a GitHub repository with transparent encryption using git-crypt.
 
 ## Overview
 
