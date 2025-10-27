@@ -47,14 +47,14 @@ This workflow monitors a VPS backup directory for new Docker container backups, 
 
 2. **Initialize Git repository in backup directory**
    ```bash
-   cd /root/Backups/docker-backups
+   cd /root/Backups/vps-backups
    git init
    git remote add origin git@github.com:yourusername/your-backup-repo.git
    ```
 
 3. **Initialize git-crypt**
    ```bash
-   cd /root/Backups/docker-backups
+   cd /root/Backups/vps-backups
    git-crypt init
    ```
 
@@ -84,7 +84,7 @@ The workflow consists of 17 nodes organized in a sequential pipeline:
 ### 2. List Backup Folders
 - **Node:** List Backup Folders on VPS
 - **Type:** SSH
-- **Command:** `ls -1d /root/Backups/docker-backups/*/`
+- **Command:** `ls -1d /root/Backups/vps-backups/*/`
 - **Purpose:** Retrieves list of all backup directories on VPS
 
 ### 3. Identify New Folders
@@ -209,7 +209,7 @@ The workflow consists of 17 nodes organized in a sequential pipeline:
    - For each SSH node, select your configured SSH credential
    - Save workflow
 
-4. **Configure backup path** (if different from `/root/Backups/docker-backups/`)
+4. **Configure backup path** (if different from `/root/Backups/vps-backups/`)
    - Update path in "List Backup Folders on VPS" node
    - Update path in all subsequent SSH commands that reference the backup directory
 
@@ -293,8 +293,8 @@ Edit the "Daily 9PM" Schedule Trigger node:
 
 ### Modify Backup Path
 Update the following variables in SSH nodes:
-- List Backup Folders: `/root/Backups/docker-backups/*/`
-- All tar/git commands: `/root/Backups/docker-backups`
+- List Backup Folders: `/root/Backups/vps-backups/*/`
+- All tar/git commands: `/root/Backups/vps-backups`
 
 ### Adjust Archive Naming
 Modify the "Prepare Archive Details" Code node:
