@@ -60,7 +60,7 @@ This workflow monitors a VPS backup directory for new Docker container backups, 
 
 4. **Export git-crypt key** (store securely)
    ```bash
-   git-crypt export-key ../git-crypt-key/docker-backups.key
+   git-crypt export-key ../git-crypt-key/vps-backups.key
    ```
 
 5. **Configure .gitattributes** (to encrypt all tar.gz files)
